@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.14.2
+
+A skill body reaches the model whole again under ptc. Both exemptions were written for a
+deployment where the skill arrives under its own tool name; under this one it arrives inside
+a `run_code` result, so neither could fire and a SKILL.md past the threshold lost its middle
+without saying so.
+
+### Fixed
+
+- **A skill loaded through `run_code` is exempt from ingress shaping.** The tool-name guard
+  never sees it — the wrapper's name is what reaches the pass — and the content guard needs a
+  `<skill_content>` tag that only a direct skill call carries. The call itself is now the
+  locator, the same way a `snap_retrieve` redemption is exempted: matched on the program's
+  arguments, so the body survives whether the model prints it whole or a slice of it.
+
+### Changed
+
+- **`skipIngressTool` covers `open_skill` and `find_skills`.** The session catalogue points the
+  model at `open_skill` for everything it does not list, and both hand back instruction text;
+  neither was exempt even where the tool name does arrive under its own name.
+- **The settings surface follows DSH 0.1.7's Config-derived namespaces.** The browser half binds
+  the `configForms` service (the `settingsScope` binder is gone) and the host half exports a
+  volatile `Config` schema instead of claiming a namespace through `settings.register`; the
+  profile's own plugin configuration is the single store, every read tracks the live reference,
+  and the `/fast-compact` card reads and writes again on 0.1.7. The strict typert codecs also
+  carry the `create()` factory the 0.1.7 registry validates.
+
+## 0.14.1
+
+The ingress stops promising recoveries it cannot deliver, and says what it did instead. Under a
+ptc deployment every call arrives as `run_code`, so the readability whitelist never matched and
+an elided middle was gone for good.
+
+### Added
+
+- **`persistIngressText()`**, plus a `savedPath` branch in the elision notice: the full text of a
+  result that no `offset`/`limit` re-read can reach is written down before it is elided, and the
+  notice names the file. Off by default (`persistIngress` / `persistDir`) — it writes files, so a
+  deployment opts in rather than inheriting the behaviour.
+- **An auditable, addressable fold**: the excerpt header carries the call identity
+  (`[Snapcompact: N tokens → excerpt · run_code <description>]`), the dropped middle stays
+  retrievable by handle, and the settings layer degrades instead of taking the plugin down.
+
+### Fixed
+
+- **No promise of a re-read that command output cannot honour.** Only a file read can keep it; a
+  `bash` result now says the bytes are unreachable instead of pointing at them.
+- **The elision notice survives long lines**, and a wrapper tool is labelled by its description
+  rather than by its wrapper name alone.
+
+## 0.14.0
+
+Where the compression actually loses information, measured without a model. The fidelity bench
+cannot answer this: `fixtures.mjs` puts every answer inside the first 39 lines on purpose, so it
+can never price a deep line. No `lib/` change.
+
+### Added
+
+- **`bench/coverage-audit.mjs`**: five equal-budget arms (`head-tail`, `head-tail+digest`,
+  `signal-first`, `rare-first`, `even-sample`) plus two controls (`all`, `head-extend`), scored by
+  whether each original line survives the compression, banded by position. 200 model-free checks
+  across the five fixtures.
+
+### Measured
+
+- **Coverage is set by the line budget, not by the choosing.** Every selective arm lands at 0–3%
+  in the middle and late bands. The controls say why: `all` scores 100% everywhere (the
+  measurement is right), and **`head-extend` — which is not clever at all, just four more head
+  lines — beats every clever arm in the early band, 67% against 4%.**
+- **The first version of this audit put `rare-first` at 67% in the early band, and it was an
+  artifact.** On homogeneous data every template ties, and ordering ties by index silently
+  degrades that arm into "extended head". Spreading ties with a fixed hash dropped it to 4%,
+  level with blind sampling. The control arm is what caught it.
+- **Signal-first is no rescue either**: `access-log` holds about 54 rows at status 503, so 16 slots
+  buy 2% of the middle band. Sparse signals are not sparse enough.
+- **The ceiling is arithmetic**: 40 kept lines out of 2 000 is 2%, whatever chose them. A decider
+  wired into the ingress can only pick a better 16 lines out of 2 000 — 0.8% — so at this layer
+  its accuracy is not the constraint. This is the measured answer to "should the decider move to
+  ingress shaping": no, and not because it is inaccurate.
+- The two things that do move coverage are keeping the re-read channel honest (`read` with
+  offset/limit, `bash` re-run — what `b742844` fixed) and changing the representation, which is
+  what the dense image does.
+
 ## 0.13.4
 
 The one competing design that runs at this plugin's layer is `billion-context`'s `absorb`: hand

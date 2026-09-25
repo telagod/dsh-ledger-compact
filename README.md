@@ -225,3 +225,23 @@ DSH_SCHEMASTER_MODULE="$DSH/node_modules/@deepseek-ai/schemastery/lib/index.mjs"
 ## License
 
 MIT. Bitmap fonts under `lib/fonts/` are documented in [`lib/fonts/README.md`](lib/fonts/README.md).
+
+## Model Experience
+
+### Tool-result shaping before the model sees it
+
+#### What the model sees
+
+到达模型前已被整形/剪枝的大工具结果，以及被剪内容的回读地址（ledger）。
+
+#### Token effect
+
+Replaced — 用摘要替换原始长结果，总量随被剪内容规模变化（省幅见本包基准）。
+
+#### KV Cache effect
+
+Replacing — 剪枝改变历史消息内容，会使此前可复用的前缀失效。
+
+## Known Limitations and Deferred Work
+
+- **压缩有损** — 摘要可能丢掉后续轮次真正需要的细节，需依赖回读路径取回；回读不可用时信息不可恢复。
