@@ -7,9 +7,18 @@
   "type": "module",
   "main": "lib/index.js",
   "exports": {
-    ".": "./lib/index.js",
-    "./client": "./lib/client.js",
-    "./ledger": "./lib/ledger.js",
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./ledger": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/ledger.js"
+    },
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
@@ -76,5 +85,6 @@
   "meta": {
     "title": "Ledger Compact",
     "description": "Ingress shaping plus optional local fast-compact; can replace the built-in /compact and automatic compaction."
-  }
+  },
+  "types": "lib/types/index.d.ts"
 }
