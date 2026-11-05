@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "会话记录压缩",
+    "description": "dsh-plugin: OMP-style ingress shaping plus optional local /fast-compact. Can replace DSH /compact and auto-compaction with a mechanical fold."
+  }
+}

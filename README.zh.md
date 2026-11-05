@@ -55,7 +55,7 @@ dsh plugin --profile web add ./dsh-ledger-compact
 打开 **设置 → 快速压缩**。改动即时写入 Host 文档。页面分三个 tab：
 
 - **入境** —— 下面四项定形设置。
-- **折页** —— 折页二次确认、替换默认压缩，以及一张折页卡的实时预览。
+- **折页** —— 折页二次确认、替换默认压缩、判定式折页，以及一张折页卡的实时预览。
 - **诊断** —— 插件版本、这台 DSH 实际暴露的会话事件读取方式、入境计数与最近失败、压缩引擎钩住数量（以及哪些引擎会静默退回模型调用）。
 
 | 设置 | 默认 | 含义 |
@@ -64,6 +64,7 @@ dsh plugin --profile web add ./dsh-ledger-compact
 | 允许密图 (`snapImages`) | 关 | 仅当主模型 `inputModalities` **明确含 `image`**，且图比原文更省时才贴 PNG |
 | 折页二次确认 (`confirmFold`) | 开 | 输入栏闪电需再点一次 |
 | 替换默认压缩 (`replaceDefault`) | **关** | `/compact`、自动压缩、溢出恢复都走机械摘要 |
+| 判定式折页 (`decideFold`) | **关** | 折页前问 typed-decide 哪些结果必须原样保留；服务不可达、超时或 margin 过低一律退回机械卡 |
 | 入境阈值 (`minSnapTokens`) | `3000` | 大约这么多 token 才摘录或贴图。范围 200–200000 |
 | 密图节省 (`savingsRatio`) | `0.85` | 摘录 + 估图 token 必须 ≤ 原文的这个比例 |
 
@@ -89,11 +90,16 @@ dsh plugin --profile web add ./dsh-ledger-compact
 默认只出文本：不打图、不调模型。候选只有**当前回合紧邻上一步**的结果；其余已经发送过的节点保持逐字节不变——这正是前缀缓存不被破坏的原因。已经是占位符的结果不会再改。`skill`、`context` 工具结果会跳过。没有 `tokenMeter` 时整段入境跳过，避免只 `replace` 却写不出 `compaction/prune`。
 
 ```
-[Snapcompact: N tokens → excerpt]
+[Snapcompact: N tokens → excerpt · read src/config.ts]
 前 16 行
 … (K lines elided; see image if attached. To inspect or edit exact bytes, re-read with offset/limit) …
 后 8 行
 ```
+
+「可回读」只对**文件读取**成立。命令行输出没有任何 `offset/limit` 入口，省略的中段就是丢了，
+所以对这类结果换一句实话——`These bytes cannot be re-read from here — repeat the call if you
+need the full text`——而不是把模型引向一个到不了的地方。判定规则是白名单：只有 `read` 算可回读，
+未知工具一律按不可回读处理（承诺做不到比少一个便利更贵）。
 
 贴 PNG 必须同时满足：
 
@@ -150,13 +156,18 @@ dsh plugin --profile web add ./dsh-ledger-compact
 
 ## 折页卡
 
-纯机械，不调模型。旧折页文本不会被套娃，但也不会丢：从上一张 `[Snapcompact]` 卡里解析出的文件、意图和错误会延续到新卡（文件只占用新跨度没用完的额度）。
+纯机械，不调模型。旧折页文本不会被套娃，但也不会丢：从上一张 `[Snapcompact]` 卡里解析出的状态、文件、意图和错误会延续到新卡（文件只占用新跨度没用完的额度）。
+
+最新一次 `todo_write` 的快照作为 `STATE` 段留在卡里 —— 折页可以清掉过程，但不清掉「现在做到哪」。当前跨度里没有待办时，才回退到上一张卡继承的那份（前缀 `↩`）。
 
 ```
 [Snapcompact] Fold ~N tok. Exact file bytes are not stored — re-read with offset/limit if a detail matters.
+STATE
+- [in_progress] 正在做的事
+- [pending] 待办
 FILES
-- [edit] 路径
-- [read] 路径
+- [edit×3] 路径
+- [read] 路径 L100-149
 INTENTS
 - 最近的用户目标
 TOOLS
@@ -170,7 +181,7 @@ EXCERPT
 [tool] …
 ```
 
-文件字节不进卡。细节要对，用 `offset` / `limit` 再读一遍。
+文件字节不进卡。细节要对，用 `offset` / `limit` 再读一遍 —— 卡里的 `×N` 是编辑次数，`L100-149` 是这次读过的窗口，照它读就是同一次读。
 
 ## 和官方压缩怎么配合
 
@@ -182,6 +193,17 @@ EXCERPT
 - 「替换默认压缩」是即时设置：勾上后已钩住的引擎都改走机械摘要，关掉或卸载插件即恢复。
 
 Web 上 compaction 在 preset isolate 里。Host 侧用 `agentPresets.serviceFor(agent, "compaction")` 读该会话的引擎，不要 `inject: ['compaction']`。
+
+### 改代码前必读：本插件依赖的 DSH 契约
+
+四处机制写在官方件里，改动前先确认它们没变：
+
+1. **`summarize()` 是唯一的定制钩子，引擎只在 preset 隔离域里挂载**。standard preset 把 `compaction-basic` 装在带 isolate realm 的 compaction group 里，`ctx.get("compaction")` 与 `agent.ctx.get("compaction")` 都读不到它，`agentPresets.serviceFor(agent, "compaction")` 是官方支持的宿主侧读法（`lib/resolve.js`）。本插件因此用运行时包裹而不是子类化替换：替换 `ctx.compaction` 会重复注册自动压缩监听器。
+2. **`SummaryResult.rawOutput` 对模板类总结器是可选字段，`llmStreamCall` 必须缺省**（官方 `@deepseek-ai/dsh-compaction-basic` 的 `lib/types/summarizer.d.ts`）。折页报告就走这个字段：第一个文本块给人读，第二个是同样数字的 JSON，供 `bench/` 与日志解析。它不会回填进模型上下文——回填的只有 `summary`。
+3. **`tool/call` 事件只存在于日志，surface 不携带它**。它的 `data.arguments` 是模型产出的**未解析 JSON 字符串**，可能不合法；工具名与定位参数因此只能从完整事件日志（`snapshotEvents` / `eventAt`）反查，且解析失败只能退化成「没有来源标注」，不允许中断入境（`lib/ingress.js`）。
+4. **前缀缓存划定入境层的边界**：已发送的节点逐字节不变，只有当前回合紧邻上一步的 `tool_result` 可被替换。这是结构约束，不是保守选择（`lib/ingress.js` 顶部）。
+
+客户端侧：DSH 用 loader 行的 specifier 定位插件的 client 半身，且**只接受包根 specifier**（子路径会让宿主加载成功却不贡献前端），所以 `cordis.patch.yml` 的 `name` 必须是包名本身；客户端入口由 `package.json` 的 `dsh.client`（`platform: web` 与 `inject`）声明。
 
 ## 开发
 

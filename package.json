@@ -1,16 +1,26 @@
 {
   "name": "dsh-ledger-compact",
-  "version": "0.13.4",
+  "version": "0.14.4",
   "description": "dsh-plugin: OMP-style ingress shaping plus optional local /fast-compact. Can replace DSH /compact and auto-compaction with a mechanical fold.",
   "license": "MIT",
   "author": "telagod",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
-    ".": "./lib/index.js",
-    "./client": "./lib/client.js",
-    "./ledger": "./lib/ledger.js",
-    "./package.json": "./package.json"
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./ledger": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/ledger.js"
+    },
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "keywords": [
     "dsh",
@@ -52,12 +62,29 @@
     "cordis.patch.yml",
     "LICENSE",
     "README.md",
-    "README.zh.md"
+    "README.zh.md",
+    "locale",
+    "icon.svg"
   ],
   "scripts": {
     "test": "node --test lib/ledger.test.js",
     "bench": "node bench/layout-bench.mjs",
     "bench:fidelity": "node bench/fidelity-bench.mjs",
     "bench:audit": "node bench/miss-audit.mjs"
-  }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-commands": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-compaction": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-token-meter": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.7-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "Ledger Compact",
+    "description": "Ingress shaping plus optional local fast-compact; can replace the built-in /compact and automatic compaction."
+  },
+  "types": "lib/types/index.d.ts"
 }

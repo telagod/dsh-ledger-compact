@@ -1,5 +1,275 @@
 # Changelog
 
+## 0.14.4
+
+The two 0.1.7 lines met. This branch's v4 fold reader and the report/degrade line's ingress
+v4 shaping, Config-model adaptation and verdict fold now ship in one plugin; nothing from
+either side was dropped.
+
+### Merged
+
+- `fix/fold-v4-tool-role` (0.13.5): the fold card reads v4 flat tool results again, plus the
+  STATE section and per-file weight/window.
+- `feat/report-source-label-settings-degrade` (0.14.3): DSH 0.1.7 Config model and typert
+  strict codec (`settingsScope` -> `configForms` on the browser side), ingress-side v4
+  shaping, and the optional verdict fold.
+
+## 0.14.3
+
+A skill body reaches the model whole again under ptc. Both exemptions were written for a
+deployment where the skill arrives under its own tool name; under this one it arrives inside
+a `run_code` result, so neither could fire and a SKILL.md past the threshold lost its middle
+without saying so.
+
+### Fixed
+
+- **A skill loaded through `run_code` is exempt from ingress shaping.** The tool-name guard
+  never sees it — the wrapper's name is what reaches the pass — and the content guard needs a
+  `<skill_content>` tag that only a direct skill call carries. The call itself is now the
+  locator, the same way a `snap_retrieve` redemption is exempted: matched on the program's
+  arguments, so the body survives whether the model prints it whole or a slice of it.
+
+### Changed
+
+- **`skipIngressTool` covers `open_skill` and `find_skills`.** The session catalogue points the
+  model at `open_skill` for everything it does not list, and both hand back instruction text;
+  neither was exempt even where the tool name does arrive under its own name.
+- **The settings surface follows DSH 0.1.7's Config-derived namespaces.** The browser half binds
+  the `configForms` service (the `settingsScope` binder is gone) and the host half exports a
+  volatile `Config` schema instead of claiming a namespace through `settings.register`; the
+  profile's own plugin configuration is the single store, every read tracks the live reference,
+  and the `/fast-compact` card reads and writes again on 0.1.7. The strict typert codecs also
+  carry the `create()` factory the 0.1.7 registry validates.
+
+## 0.14.2
+
+What the verdict decider actually keys on, measured on five benches. One behaviour change: a span
+with no user request no longer spends a verdict pass.
+
+### Changed
+
+- **`foldSummaryDecided` skips the verdict pass when the task is empty.** Measured on three real
+  sessions: handed no task, the decider answered "drop" for all twelve candidates — byte-identical
+  to what it answers when it is handed no task at all. "Still needed to finish the current task"
+  has no referent without a request, so the pass does not run and the card stays mechanical.
+
+### Added
+
+- **Five benches**, each answering one question, all re-runnable: `decide-evidence-bench.mjs`
+  (evidence completeness, page length, margin calibration), `decide-wording-bench.mjs` (wording
+  against fact, with a false-statement control), `decide-later-bench.mjs` (the four shipped
+  later-context sentences), `decide-primitive-bench.mjs` (Noul against Choice and Score),
+  `decide-task-bench.mjs` (how far the task line moves the answer).
+- **`bench/DECIDE-FINDINGS.md`**: the method, the numbers, and the two changes that measurement
+  rejected.
+
+### Measured
+
+- **The quadrant is right; the conjunctive question was wrong.** On the 13 calibration cases:
+  conjunctive 9/13 with 4 dangerous drops, split 9/13 with 1, **quadrant 13/13 safe with 0**
+  (truncate 7, drop 3, keep 3). `decide-calibration.mjs --json` now reports all three ledgers —
+  reading only the conjunctive one turns "the quadrant is entirely safe" into "4 dangerous drops".
+- **Evidence completeness decides the answer.** Same result without a later-context line: accuracy
+  **0.500**, probability pinned at 0.51–0.57, margin 0.01–0.07. Add the line: **1.000**. Page
+  length (200/700/2000) changes nothing.
+- **Wording moves the answer by about 0.32.** One fact, four phrasings, six real files, every file
+  the same direction; a false statement pulls 0.117 to 0.440 and crosses the line in 2 of 6, while
+  margin falls from 0.383 to 0.090. Evidence sentences state facts; they do not argue.
+- **`minMargin = 0.15` is supported** — 31/31 correct above it, 0.882 below. **But margin measures
+  the decider's own confidence, not the clarity of the facts**: an empty task produced the same
+  12/12 answer on all three sessions, with margin 0.12–0.19, higher than some real tasks at 0.075.
+- **The task line moves the answer 5.3x**: dropped tokens ranged 8562–45618 across four task
+  variants of one span.
+- **Given enough evidence the three primitives agree** (top-1 4/4 each) at 24, 4 and 4 requests.
+- **"Use the future to check the past" was falsified.** The attempt to build real-session gold --
+  cut a finished session in half and ask whether the entries judged `drop` were cited afterwards --
+  died on its own control twice. With rarity defined inside the twelve candidates the hit rate was
+  **0.105 against 0.108 for random strings**: the same number, so the "0.58 false-drop lower bound"
+  it produced was an artifact. Whole-corpus rarity does separate (0.017 against 0.106), but of the
+  eight surviving hits half are generic words and the rest are paths -- and "the same file was
+  touched again" is the reason to drop, not evidence of a mistake. See `bench/DECIDE-FINDINGS.md`.
+- **The workable version of that idea is path tracing.** "Did the model re-read the file before
+  writing it?" is a structural fact, not a semantic guess. On four real sessions, of **42 candidates
+  judged `drop`, none erased content that was not also covered by another surviving result** -- and in
+  one session `config.js` was covered by six results while the decider dropped exactly one of them.
+  Two of the four sessions could not be checked at all (their candidates were command output with no
+  file paths), so this is a lower bound on safety, not a proof of it.
+
+## 0.14.1
+
+Where the compression actually loses information, measured without a model. The fidelity bench
+cannot answer this: `fixtures.mjs` puts every answer inside the first 39 lines on purpose, so it
+can never price a deep line. No `lib/` behaviour change.
+
+### Added
+
+- **`bench/coverage-audit.mjs`**: five equal-budget arms (`head-tail`, `head-tail+digest`,
+  `signal-first`, `rare-first`, `even-sample`) plus two controls (`all`, `head-extend`), scored by
+  whether each original line survives the compression, banded by position. 200 model-free checks
+  across the five fixtures.
+
+### Measured
+
+- **Coverage is set by the line budget, not by the choosing.** Every selective arm lands at 0–3%
+  in the middle and late bands. The controls say why: `all` scores 100% everywhere (the
+  measurement is right), and **`head-extend` — which is not clever at all, just four more head
+  lines — beats every clever arm in the early band, 67% against 4%.**
+- **The first version of this audit put `rare-first` at 67% in the early band, and it was an
+  artifact.** On homogeneous data every template ties, and ordering ties by index silently
+  degrades that arm into "extended head". Spreading ties with a fixed hash dropped it to 4%,
+  level with blind sampling. The control arm is what caught it.
+- **Signal-first is no rescue either**: `access-log` holds about 54 rows at status 503, so 16 slots
+  buy 2% of the middle band. Sparse signals are not sparse enough.
+- **The ceiling is arithmetic**: 40 kept lines out of 2 000 is 2%, whatever chose them. A decider
+  wired into the ingress can only pick a better 16 lines out of 2 000 — 0.8% — so at this layer
+  its accuracy is not the constraint. This is the measured answer to "should the decider move to
+  ingress shaping": no, and not because it is inaccurate.
+- The two things that do move coverage are keeping the re-read channel honest (`read` with
+  offset/limit, `bash` re-run — what `b742844` fixed) and changing the representation, which is
+  what the dense image does.
+
+### Fixed
+
+- **A counter with no reader, and no count.** `hook.js` incremented `HOOK_STATS.verdictFolds`
+  on every verdict pass, but the field was never declared on `HOOK_STATS` and `hookStats()` never
+  exposed it: the value was `NaN` from the first pass, and nothing in the repo read it. A pass's
+  only record is the `verdictFold` object in the fold report; the dead increment is gone.
+
+### Measured
+
+- **The verdict switch's first real fold.** A manual `/fast-compact` over a 317-message span
+  reached the decider with 12 candidates and came back `keep 0 · truncate 0 · drop 4 ·
+  mechanical 8`, `failed 0`, in 2 616 ms — inside the 4 s budget. The card carried no
+  verdict-derived section (`keep` is the only action that can add one, and a `drop` has nothing
+  to save at this layer), while the fold itself went from 26 ms to 2 654 ms. That answers
+  0.14.0's open 'not measured' question: on this evidence the switch buys latency and no card.
+
+## 0.14.0
+
+The verdict fold. typed-decide is asked which of a span's tool results a card must carry
+verbatim, and the ones it calls still-needed-and-not-reproducible get their body back.
+Off by default, and the first landing deliberately moves nothing else: every failure path
+returns the card this plugin already shipped.
+
+### Added
+
+- **`decideFold`** (`lib/decide-fold.js`), a settings switch that is `false` out of the box.
+  Two `noul` questions are asked in one `POST /v1/decide/batch` call per candidate — *still
+  needed*, and *could this be obtained again by re-running the same call* — and the quadrant
+  decides the treatment: not-needed + reproducible is the only `drop`, still-needed +
+  not-reproducible is the only `keep`, and everything else keeps the mechanical treatment.
+- **Evidence the decider cannot derive on its own**: `laterContextOf` scans the span for a
+  later step touching the same target, and states whether it read the target again or rewrote
+  it. Without it the decider only guesses; with it, "superseded" is a fact about the span —
+  worded neutrally, because a leading sentence gets answered as if it were the question.
+- **`bench/fold-live-scan.mjs`**: replays a real `session.jsonl.zstd` through this plugin's own
+  `inspectMessages`, then decides the largest candidates for real. It answers what the
+  hand-built span on `bench/decide-span-bench.mjs` cannot: how much decidable surface a live
+  session actually has.
+- **A `CARRIED DETAIL` section** in the fold card, holding the restored bodies, and a
+  `verdict fold` row plus a `verdictFold` object in the `rawOutput` report — so the
+  trajectory tab's compaction cell shows which span this pass decided about.
+
+### Measured
+
+- **The ingress is the wrong layer for this, and the code says so.** `shapeIngress` may only
+  rewrite the result of the immediately preceding step: an older node already sits in a
+  provider-cached prefix, and rewriting it forces a full re-prefill of everything after it.
+  That window — the result that has just been produced — is exactly where a decider has no
+  discriminating power, because nothing has superseded it yet. A fold rewrites the whole span
+  in one write, so the cache is invalidated either way and the decision is free. This is why
+  the switch is wired to the fold and not to `shapeCurrentTurnIngress`.
+- **On a real 251-result session the decider has no verdict to give.** Replaying
+  `session-540b2b69` (545 messages, 251 tool results, 95 827 tok): 12 results clear the 200-token
+  floor. Asked with the real user request, every margin landed between **0.01 and 0.10** — under
+  the 0.15 gate — so 11 answers were discarded as no-verdict and one became a `drop`. The single
+  superseded access-log result behaved the same way: `needed 0.52 / margin 0.02`. A 0.02 margin
+  must not become a deletion, so `minMargin` routes low-confidence answers to the mechanical
+  treatment, which is the card this plugin already shipped.
+- **The evidence sentence decides the answer.** The first run of that scan told the decider
+  "Nothing in the span refers back to this result" and it dropped **10 of 12**. Reworded
+  neutrally and handed the real user request, the same span dropped **1 of 12**. The decider was
+  answering the hint. A decider fed a leading question is not a measurement — the wording, and a
+  test pinning it, are part of this release.
+- **`Number(null)` is 0**, and the wire shape reports an absent probability as `null`. A test
+  caught the coercion turning "the decider did not answer" into "certainly not needed" — the
+  one direction that deletes context. Absent and unusable values are `null` and are read as no
+  verdict.
+- Cost and latency, measured against the gateway: `GET /v1/decide/health` 33 ms; one two-question
+  batch 907 ms at $0.000037 per question. The pass is off the critical path by default, times out
+  at 4 s overall, and asks about at most 12 results of 200+ tokens, largest first.
+- **End to end on a real session, the card is byte-identical — and that is the honest shape of
+  this release.** `bench/fold-live-scan.mjs --fold` now runs the whole path (real decider, real
+  card, real report) over a replayed session: 545 messages, 216 450 discarded tokens, a 49-line
+  card. With the switch on and 12 results decided, the card came back **identical to the
+  mechanical one** — `keep 0` — and the report carried `verdict fold  12 asked · keep 0 ·
+  truncate 0 · drop 1 · mechanical 11` plus a `verdictFold` object for the trajectory tab. The
+  wiring is live and observable; on the evidence so far it is also inert, because at this layer
+  only `keep` can change the card and the gate rejects nearly every answer.
+- **Twelve concurrent calls are more than the upstream takes; four are not.** The first scan lost
+  6 of 12 to transient upstream errors, the end-to-end fold run lost 5 of 12, and a run served
+  entirely from the ledger cache lost none — the loss tracks the upstream, not this code. Wired at
+  12 the switch would have degraded half of every pass. `decideEntries` now runs at most 4 at a
+  time (`concurrency`) and retries a failed call once (`retries`, 300 ms backoff): the same
+  end-to-end fold on a fresh session came back **0 failed of 12** in 2 679 ms. Every failure path
+  is still per-entry and still ends in the mechanical treatment, so a throttled decider costs
+  verdicts and never a fold.
+- **The losing branch of the budget race kept the process alive.** `Promise.race` left the 4 s
+  budget timer armed after the pass had finished; the test suite went from 310 ms to 4 376 ms and
+  that timer was the whole difference. It is cleared in a `finally` now.
+
+### Not measured
+
+- Whether the pass pays for itself on a live fold. The span above was scanned offline; no fold
+  has run with the switch on, so the card's real token effect and the latency a manual
+  `/fast-compact` would gain are still unmeasured. Until one has, the switch stays off — and note
+  that with the current evidence the gate rejects nearly every answer, so switching it on would
+  change almost nothing yet.
+- Whether a fold should also drop what the decider calls superseded. The mechanical card already
+  discards every tool body — it keeps one `[tool] name target` line — so there is nothing left
+  for a `drop` to save at this layer.
+
+## 0.13.5
+
+The fold card was dropping the work record under session format v4, and a compact was therefore
+costing more re-work than it saved. Fixed, and the card now keeps the one piece of state that
+cannot be re-read: what the agent was in the middle of doing.
+
+### Fixed
+
+- **A v4 tool result is read again.** `toolResultOf` only knew the nested block shape; under v4 the
+  result message carries `role: "tool"` with flat content and the `toolCallId` on the message, so
+  the reader returned nothing and the card silently fell back to INTENTS + EXCERPT. Every file,
+  command, exit code and tool count was missing, with no error to notice — the card said what the
+  user asked for and never what the agent did. Same failure mode as the ingress-side v4 fix, which
+  patched `resultBlockOf` and left this reader behind.
+- **Todo whitespace collapsing used a doubled backslash**, matching a literal backslash instead of
+  collapsing whitespace.
+
+### Added
+
+- **A STATE section.** The newest `todo_write` snapshot rides the card, so a fold clears the process
+  without clearing where the work stood; a span with no todos falls back to the inherited list,
+  marked with a carried-forward arrow. `billion-context` reaches for the same idea with
+  `protectedLatestTools`. Mechanical: it carries only arguments the model already wrote, no model call.
+- **File bullets carry weight and window.** `[edit x3] path` counts edits per file, and a read that
+  named a range keeps it (`[read] path L100-149`). The card already told the model to re-read with
+  `offset`/`limit`; naming the window makes that a concrete call instead of a guess. Older cards
+  still parse.
+
+### Measured
+
+- On a real 900-message session the card goes from INTENTS + EXCERPT only to **6 state lines, 22
+  files, 15 tool counts, 26 commands and 8 errors** — 2,489 to 10,073 chars (roughly 690 to 2,800
+  tokens). Against the 179,338 tokens that fold replaced, the ratio moves from ~260:1 to ~64:1.
+  Four times the card buys back a usable work ledger; the ratio was never the point.
+
+### Known limitation
+
+- Sessions whose tool calls all arrive as `run_code` still get no FILES: that whitelist does not
+  include it, and its file operations happen inside PTC sub-calls. Reading the `code` argument or
+  subscribing to PTC dispatch events would fix it; not attempted here.
+
 ## 0.13.4
 
 The one competing design that runs at this plugin's layer is `billion-context`'s `absorb`: hand

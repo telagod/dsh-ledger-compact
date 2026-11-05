@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Ledger Compact",
+    "description": "Ingress shaping plus optional local fast-compact; can replace the built-in /compact and automatic compaction."
+  }
+}
